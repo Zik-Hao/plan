@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Компас — планировщик путешествий</title>
+<meta name="theme-color" content="#0B57D0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="toast" class="toast" aria-live="polite"></div>
+
+<!-- ================= HOME ================= -->
+<section id="screen-home" class="screen active">
+  <div class="home-wrap">
+    <div class="home-hero">
+      <div class="stamp-badge"><span class="material-symbols-outlined">flight_takeoff</span> путешествия</div>
+      <h1 class="app-title">Компас</h1>
+      <p class="app-tagline">Собирайте маршрут по дням, месту и настроению — а мы сохраним каждую деталь.</p>
+    </div>
+    <div class="home-actions">
+      <button id="btn-plan-route" class="btn btn-home-filled btn-large">
+        <span class="material-symbols-outlined">add_road</span> Спланировать маршрут
+      </button>
+      <button id="btn-my-routes" class="btn btn-home-outlined btn-large">
+        <span class="material-symbols-outlined">map</span> Выбрать мой маршрут
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MY ROUTES ================= -->
+<section id="screen-my-routes" class="screen">
+  <header class="topbar">
+    <button class="icon-btn back-btn" data-back><span class="material-symbols-outlined">arrow_back</span></button>
+    <h2>Мои маршруты</h2>
+    <span class="topbar-spacer"></span>
+  </header>
+  <div id="routes-list" class="routes-list"></div>
+  <div id="routes-empty" class="empty-state" hidden>
+    <p>Пока нет сохранённых маршрутов.</p>
+    <button class="btn btn-primary" id="btn-empty-plan">Спланировать первый маршрут</button>
+  </div>
+  <div class="import-row">
+    <button id="btn-import-route" class="btn btn-outline">
+      <span class="material-symbols-outlined">upload_file</span> Импортировать маршрут (PDF или JSON)
+    </button>
+    <input type="file" id="import-route-input" accept=".pdf,.json,application/pdf,application/json" hidden>
+  </div>
+</section>
+
+<!-- ================= CITY SELECT ================= -->
+<section id="screen-city-select" class="screen">
+  <header class="topbar">
+    <button class="icon-btn back-btn" data-back><span class="material-symbols-outlined">arrow_back</span></button>
+    <h2>Куда собираемся?</h2>
+    <span class="topbar-spacer"></span>
+  </header>
+  <div id="city-grid" class="city-grid"></div>
+</section>
+
+<!-- ================= PLANNER ================= -->
+<section id="screen-planner" class="screen">
+  <header class="topbar">
+    <button class="icon-btn back-btn" data-back><span class="material-symbols-outlined">arrow_back</span></button>
+    <input id="route-name-input" class="route-name-input" placeholder="Название маршрута">
+    <div class="menu-wrap">
+      <button class="icon-btn" id="btn-more-menu" title="Ещё"><span class="material-symbols-outlined">more_vert</span></button>
+      <div class="menu" id="export-menu">
+        <button class="menu-item" id="btn-export-pdf"><span class="material-symbols-outlined">picture_as_pdf</span> Экспорт в PDF</button>
+        <button class="menu-item" id="btn-export-json"><span class="material-symbols-outlined">save</span> Экспорт в файл (JSON)</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="tab-planner">Планировщик</button>
+    <button class="tab-btn" data-tab="tab-places">Места</button>
+  </div>
+
+  <!-- ---- Tab: Планировщик ---- -->
+  <div id="tab-planner" class="tab-panel active">
+    <div class="planner-toolbar">
+      <div class="active-day-select">
+        <label>Активный день</label>
+        <select id="active-day-select"></select>
+      </div>
+      <div class="toolbar-btns">
+        <button id="btn-add-item" class="btn btn-accent btn-sm"><span class="material-symbols-outlined">add</span> Место</button>
+        <button id="btn-add-day" class="btn btn-outline btn-sm"><span class="material-symbols-outlined">add</span> День</button>
+      </div>
+    </div>
+    <div id="days-list" class="days-list"></div>
+    <div id="days-empty" class="empty-state">
+      <p>Ещё нет ни одного дня. Начните с кнопки «+ День».</p>
+    </div>
+  </div>
+
+  <!-- ---- Tab: Места ---- -->
+  <div id="tab-places" class="tab-panel">
+    <div class="places-toolbar">
+      <input id="places-search" class="search-input" type="search" placeholder="Найти место…">
+      <button id="btn-add-place" class="btn btn-accent btn-sm"><span class="material-symbols-outlined">add</span> Своё место</button>
+    </div>
+    <div id="places-category-filter" class="category-filter"></div>
+    <div id="places-categories" class="places-categories"></div>
+  </div>
+</section>
+
+<!-- ================= MODAL: Add custom city ================= -->
+<div id="modal-add-city" class="modal-overlay">
+  <div class="modal-card">
+    <h3>Новый город</h3>
+    <label>Название города</label>
+    <input id="input-city-name" type="text" placeholder="Например, Казань">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close-modal>Отмена</button>
+      <button class="btn btn-primary" id="btn-confirm-add-city">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: Add day ================= -->
+<div id="modal-add-day" class="modal-overlay">
+  <div class="modal-card">
+    <h3>Новый день</h3>
+    <label>Дата</label>
+    <input id="input-day-date" type="date">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close-modal>Отмена</button>
+      <button class="btn btn-primary" id="btn-confirm-add-day">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: Add item (choose mode) ================= -->
+<div id="modal-add-item" class="modal-overlay">
+  <div class="modal-card">
+    <h3>Добавить в план</h3>
+    <div class="segmented">
+      <button class="segmented-btn active" data-item-mode="existing">Из базы мест</button>
+      <button class="segmented-btn" data-item-mode="custom">Своё</button>
+    </div>
+
+    <div id="item-mode-existing" class="item-mode-panel">
+      <label>Место</label>
+      <button id="btn-pick-place" class="btn btn-outline" style="width:100%">Выбрать место из базы…</button>
+      <div id="picked-place-preview" class="picked-place-preview" hidden></div>
+    </div>
+
+    <div id="item-mode-custom" class="item-mode-panel" hidden>
+      <label>Название</label>
+      <input id="input-custom-title" type="text" placeholder="Например, прогулка по набережной">
+      <label>Категория</label>
+      <select id="input-custom-category"></select>
+    </div>
+
+    <label>Время</label>
+    <input id="input-item-time" type="time">
+    <label>Заметка</label>
+    <textarea id="input-item-note" rows="2" placeholder="Необязательно"></textarea>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close-modal>Отмена</button>
+      <button class="btn btn-primary" id="btn-confirm-add-item">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: Place picker ================= -->
+<div id="modal-place-picker" class="modal-overlay">
+  <div class="modal-card modal-card-large">
+    <h3>Выбрать место</h3>
+    <input id="picker-search" class="search-input" type="search" placeholder="Найти место…">
+    <div id="picker-list" class="picker-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close-modal>Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: Place detail / edit ================= -->
+<div id="modal-place" class="modal-overlay">
+  <div class="modal-card modal-card-large">
+    <div class="place-modal-header">
+      <h3 id="place-modal-title">Место</h3>
+      <button id="btn-edit-place" class="icon-btn" title="Редактировать"><span class="material-symbols-outlined">edit</span></button>
+    </div>
+
+    <div id="place-view-mode">
+      <p id="place-view-description" class="place-view-description"></p>
+      <div class="place-view-grid">
+        <div><span class="label">Режим работы</span><span id="place-view-hours"></span></div>
+        <div><span class="label">Стоимость</span><span id="place-view-price"></span></div>
+      </div>
+      <p id="place-view-note" class="place-view-note"></p>
+      <div class="place-view-links">
+        <a id="place-view-map" class="btn btn-outline" target="_blank" rel="noopener"><span class="material-symbols-outlined">map</span> Построить маршрут</a>
+        <a id="place-view-site" class="btn btn-outline" target="_blank" rel="noopener" hidden><span class="material-symbols-outlined">link</span> Официальный сайт</a>
+      </div>
+    </div>
+
+    <div id="place-edit-mode" hidden>
+      <label>Название</label>
+      <input id="edit-place-name" type="text">
+      <label>Категория</label>
+      <select id="edit-place-category"></select>
+      <div id="new-category-row" class="new-category-row">
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-new-category">
+          <span class="material-symbols-outlined">add</span> Своя категория
+        </button>
+        <div id="new-category-input-row" class="new-category-input-row" hidden>
+          <input id="input-new-category-name" type="text" placeholder="Название категории">
+          <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-new-category">Создать</button>
+        </div>
+      </div>
+      <label>Краткое описание</label>
+      <textarea id="edit-place-description" rows="3"></textarea>
+      <label>Режим работы</label>
+      <input id="edit-place-hours" type="text">
+      <label>Примерная стоимость</label>
+      <input id="edit-place-price" type="text">
+      <label>Ссылка на Яндекс Карты</label>
+      <input id="edit-place-map" type="text">
+      <label>Официальный сайт (необязательно)</label>
+      <input id="edit-place-site" type="text">
+      <label>Заметка</label>
+      <textarea id="edit-place-note" rows="2"></textarea>
+    </div>
+
+    <div class="modal-actions modal-actions-between">
+      <button class="btn btn-danger" id="btn-delete-place">Удалить</button>
+      <div>
+        <button class="btn btn-ghost" data-close-modal>Закрыть</button>
+        <button class="btn btn-primary" id="btn-save-place" hidden>Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: Пункт плана (время/заметка редактируются всегда) ================= -->
+<div id="modal-custom-item" class="modal-overlay">
+  <div class="modal-card">
+    <h3>Пункт плана</h3>
+
+    <div id="item-place-info" class="item-place-info" hidden>
+      <span class="item-place-info-name" id="item-place-info-name"></span>
+      <button class="btn btn-outline btn-sm" id="btn-open-place-from-item">
+        <span class="material-symbols-outlined">open_in_new</span> Карточка места
+      </button>
+    </div>
+
+    <div id="item-title-field" hidden>
+      <label>Название</label>
+      <input id="ci-title" type="text" placeholder="Например, прогулка по набережной">
+    </div>
+
+    <label>Время</label>
+    <input id="ci-time" type="time">
+    <label>Заметка</label>
+    <textarea id="ci-note" rows="3" placeholder="Необязательно"></textarea>
+    <div class="modal-actions modal-actions-between">
+      <button class="btn btn-danger" id="btn-delete-custom-item">Удалить</button>
+      <div>
+        <button class="btn btn-ghost" data-close-modal>Отмена</button>
+        <button class="btn btn-primary" id="btn-save-custom-item">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script type="module">
+  import * as pdfjsLib from "./js/vendor/pdf.min.mjs";
+  window.pdfjsLib = pdfjsLib;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "./js/vendor/pdf.worker.min.mjs";
+</script>
+<script src="js/registry.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/pdf-font.js"></script>
+<script src="js/pdf-export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
