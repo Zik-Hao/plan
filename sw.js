@@ -1,10 +1,10 @@
 // Service worker для офлайн-работы приложения.
-// Стратегия: при установке заранее кладём в кэш все свои файлы и (по возможности)
-// внешние библиотеки; во время работы — «кэш, а если нет, то сеть», и всё удачно
-// загруженное само добавляется в кэш, включая шрифты и сторонние CDN-скрипты.
-// После первого успешного запуска онлайн приложение полностью работает офлайн.
+// Стратегия — «stale-while-revalidate»: отвечаем из кэша сразу (мгновенно,
+// работает офлайн), а параллельно в фоне идём в сеть и обновляем кэш свежей
+// версией на СЛЕДУЮЩИЙ раз. Так новый город или правки в коде подтягиваются
+// уже при следующем открытии приложения, а не зависают в кэше навсегда.
 
-const CACHE_NAME = "travel-planner-v3";
+const CACHE_NAME = "travel-planner-v5";
 
 // Собственные файлы приложения — обязательны для офлайн-запуска.
 const APP_SHELL = [
@@ -32,7 +32,8 @@ const APP_SHELL = [
 // при первом успешном онлайн-запросе (см. обработчик fetch ниже).
 const THIRD_PARTY_ASSETS = [
   "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
-  "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+  "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap",
+  "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
 ];
 
 self.addEventListener("install", (event) => {
@@ -67,24 +68,37 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  // Запросы к самому Chrome DevTools и т.п. пропускаем.
+  // Запросы к самому браузеру/расширениям и т.п. пропускаем.
   if (!event.request.url.startsWith("http")) return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const cached = await cache.match(event.request);
+
+      // Идём в сеть в любом случае — если получилось, кладём свежий ответ
+      // в кэш для следующего открытия приложения.
+      const networkFetch = fetch(event.request)
         .then((response) => {
-          // Кэшируем любой успешно загруженный GET-ответ — как свои файлы,
-          // так и сторонние (шрифты Google Fonts, скрипты с CDN) — чтобы после
-          // первого онлайн-запуска всё это было доступно офлайн.
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
+          if (response && response.ok) cache.put(event.request, response.clone());
           return response;
         })
-        .catch(() => cached);
+        .catch(() => null);
+
+      // Не даём браузеру «убить» воркер, пока фоновое обновление кэша не завершится,
+      // даже если мы уже ответили пользователю из кэша ниже.
+      event.waitUntil(networkFetch);
+
+      if (cached) {
+        // Отдаём то, что уже есть, не дожидаясь сети — быстро и работает офлайн.
+        return cached;
+      }
+
+      // В кэше пока ничего нет — ждём сеть один раз (например, самый первый запуск).
+      const fromNetwork = await networkFetch;
+      return fromNetwork || new Response("Нет соединения, и этот файл ещё не сохранён офлайн.", {
+        status: 503,
+        statusText: "Offline"
+      });
     })
   );
 });
